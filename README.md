@@ -1,0 +1,1 @@
+Red Hat Ansible Automation Platform deployment scenarios using Vagrant and Ansible
