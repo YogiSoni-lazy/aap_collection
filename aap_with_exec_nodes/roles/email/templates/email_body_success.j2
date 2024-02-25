@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+
+<p></p>
+
+Dear <b>{{ user_fullname }}</b>,
+
+<p><b>Here is the summary of the build</b></p>
+
+<table width='40%'>
+  <tr><td><strong>System Owner:</strong></td> <td> {{ user_fullname }} </td></tr>
+  <tr><td><strong>Build Date:</strong></td> <td>{{ vm_created_date }}</td></tr>
+  <tr><td><strong>Expiry Date:</strong></td> <td>{{ vm_expiry_date }}</td></tr>
+  <tr><td><strong>Scenario:</strong></td> <td><strong>{{ selected_scenario }}</font></strong></td></tr>
+  <tr><td><strong>Version:</strong></td> <td>{{ aap_version }}</td></tr>
+  <tr><td><strong>Build Status:</strong></td> <td><strong> <font color="green">SUCCESS</font></strong></td></tr>
+</table>
+
+<br>
+
+<h3>Your instance details are as follows</h3>
+<table width='89%' border='1' cellpadding='3' style='border:1px solid black; border-collapse:collapse'>
+  <tr style='background-color:lightgreen'>
+    <th>SYSTEM ROLE</th> <th>HOSTNAME</th> <th>IP ADDRESS</th> <th>ROOT PASSWORD</th> <th>WEBUI PASSWORD</th>
+  </tr>
+  {% if scenario == "aap_cluster_with_haproxy" %}
+    {% for n in '1', '2' %}
+      <tr>
+	<td align="center">AAP Controller{{ n }}</td> 
+	<td align="center">{{ lookup('vars', 'aap_controller' + n + '_hostname') }}</td>
+        <td align="center">{{ lookup('vars', 'aap_controller' + n + '_ipaddress') }}</td>
+        <td align="center">{{ root_password }}</td>
+        <td align="center">{{ admin_password }}</td>
+      </tr>
+    {% endfor %}
+  {% endif %}
+  {% if aap_controller_hostname is defined %}
+    <tr>
+      <td align="center">AAP Controller</td>
+      <td align="center">{{ aap_controller_hostname }}</td>
+      <td align="center">{{ aap_controller_ipaddress }}</td>
+      <td align="center">{{ root_password }}</td>
+      <td align="center">{{ admin_password }}</td>
+    </tr>
+  {% endif %}
+  {% if aap_hub_hostname is defined %}
+    <tr>
+      <td align="center">Automation Hub</td>
+      <td align="center">{{ aap_hub_hostname }}</td>
+      <td align="center">{{ aap_hub_ipaddress }}</td>
+      <td align="center">{{ root_password }}</td>
+      <td align="center">{{ hub_admin_password }}</td>
+    </tr>
+  {% endif %}
+  {% if aap_eda_hostname is defined %}
+    <tr>
+      <td align="center">EDA Controller</td>
+      <td align="center">{{ aap_eda_hostname }}</td>
+      <td align="center">{{ aap_eda_ipaddress }}</td>
+      <td align="center">{{ root_password }}</td>
+      <td align="center">{{ eda_admin_password }}</td>
+    </tr>
+  {% endif %}
+  {% if aap_db_hostname is defined %}
+    <tr>
+      <td align="center">AAP External Database</td>
+      <td align="center">{{ aap_db_hostname }}</td>
+      <td align="center">{{ aap_db_ipaddress }}</td>
+      <td align="center">{{ root_password }}</td>
+      <td align="center">-</td>
+    </tr>
+  {% endif %}
+  {% if aap_lb_hostname is defined %}
+    <tr>
+      <td align="center">LB (HAProxy) Server</td>
+      <td align="center">{{ aap_lb_hostname }}</td>
+      <td align="center">{{ aap_lb_ipaddress }}</td>
+      <td align="center">{{ root_password }}</td>
+      <td align="center">-</td>
+    </tr>
+  {% endif %}
+</table>
+
+<br>
+<br>
+
+<h3><img src="https://drive.google.com/uc?export=view&id=1LMgCyEMTNcX8hyehj5o8rap4IoVnYcxt" width="50px" height="50px" style="vertical-align:middle;margin:25px 5px""/>Information</h3>
+  <li>After completing your testing, delete VMs by running <strong>Delete deployed AAP Setup</strong> job template.</li>
+  <li>By default VMs would be deleted after {{ expiration['max_days'] }} days, you can further extend the expiry by another {{ expiration['extend_days'] }} days. Run <b>Extend expiration of VMs</b> template for extending the expiry.</li>
+  <li>System Owner would be completely liable for the loss flowing from negligence or misuse of the VMs that they have deployed.</li>
+  <li>If you have any further queries or clarification that isn't provided here, do reach out to <a href="mailto:awxlab-admins@redhat.com">LAB Admins Team.</a></li>
+
+<br>
+
+  <hr></hr>
+  <strong><font color="darkgreen">Success is not the key to happiness. Happiness is the key to success. If you love what you are doing, you will be successful.</font></strong>
+
+</html>

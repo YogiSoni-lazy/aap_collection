@@ -1,0 +1,97 @@
+---
+- name: Create VM on vCenter
+  community.vmware.vmware_guest:
+    hostname: "{{ vcenter_server['hostname'] }}"
+    username: "{{ vcenter_server['username'] }}"
+    password: "{{ vcenter_password }}"
+    name: "{{ awx_user_name }}-{{ rolename }}"
+    state: poweredon
+    template: "AWXLAB-RHEL{{ rhel_version }}"
+    datacenter: "{{ vcenter_server['datacenter'] }}"
+    cluster: "{{ vcenter_server['cluster'] }}"
+    folder: "{{ user_folder_name }}"
+    annotation: "{{ aap_version }}"
+    hardware:
+      memory_mb: >
+        {{ ('controller' in rolename or 'hub' in rolename or 'eda' in rolename) |
+        ternary(vcenter_vm['ctrl_memory'], vcenter_vm['memory']) }}
+      num_cpus: "{{ vcenter_vm['cpus'] }}"
+      scsi: "{{ vcenter_storage['scsi_logic'] | default('lsilogic') }}"
+    disk:
+    - size_gb: "{{ vcenter_storage['disk_size'] }}"
+      type: "{{ vcenter_storage['disk_type'] | default('thin') }}"
+      datastore: "{{ vcenter_storage['datastore'] }}"
+    networks:
+    - name: "{{ vcenter_network['name'] }}"
+      device_type: "{{ vcenter_network['device_type'] | default('vmxnet3') }}"
+      type: dhcp
+      connected: true
+      start_connected: true
+    wait_for_ip_address: true
+    wait_for_ip_address_timeout: 600
+  register: vm_info
+
+- name: Fetch Managed object ID (moid) of user VM
+  community.vmware.vmware_guest_info:
+    hostname: "{{ vcenter_server['hostname'] }}"
+    username: "{{ vcenter_server['username'] }}"
+    password: "{{ vcenter_password }}"
+    datacenter: "{{ vcenter_server['datacenter'] }}"
+    folder: "{{ user_folder_name }}"
+    name: "{{ awx_user_name }}-{{ rolename }}"
+    schema: "vsphere"
+    properties: ["_moId"]
+  register: moid_info
+
+- name: Tag custom attributes
+  community.vmware.vmware_guest_custom_attributes:
+    hostname: "{{ vcenter_server['hostname'] }}"
+    username: "{{ vcenter_server['username'] }}"
+    password: "{{ vcenter_password }}"
+    state: present
+    moid: "{{ moid_info['instance']['moid'] }}"
+    attributes:
+      - name: aap_version
+        value: "{{ aap_version }}"
+      - name: scenario
+        value: "{{ selected_scenario | lower | replace(' ', '_') }}"
+      - name: rhel_version
+        value: "{{ rhel_version }}"
+      - name: setup_lb
+        value: "{{ ('haproxy' in scenario) | ternary(true, false) }}"
+
+- name: Set temporary hostname fact
+  ansible.builtin.set_fact:
+    current_hostname: "{{ lookup('dig', ''~vm_info['instance']['ipv4']~'/PTR')[:-1] }}"
+
+- name: Add current host to static inventory
+  awx.awx.host:
+    name: "{{ current_hostname }}"
+    inventory: "Static Inventory"
+    enabled: true
+    controller_host: "{{ awxlab_controller_hostname }}"
+    controller_username: "{{ awxlab_controller_super_user }}"
+    controller_password: "{{ awxlab_controller_password }}"
+    state: present
+    validate_certs: false
+
+- name: Export hostname and IP address facts
+  ansible.builtin.set_stats:
+    data:
+      "aap_{{ rolename }}_hostname": "{{ current_hostname }}"
+      "aap_{{ rolename }}_ipaddress": "{{ vm_info['instance']['ipv4'] }}"
+
+- name: Set hostname
+  ansible.builtin.hostname:
+    name: "{{ current_hostname }}"
+  connection: ssh
+  delegate_to: "{{ current_hostname }}"
+  vars:
+    ansible_user: root
+    ansible_password: "{{ root_password }}"
+
+- name: Add hostname to a group based on role
+  ansible.builtin.add_host:
+    name: "{{ current_hostname }}"
+    group: "{{ ('haproxy' in scenario and 'controller' in rolename) | ternary(rolename[:-1], rolename) }}"
+...

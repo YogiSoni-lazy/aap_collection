@@ -1,0 +1,79 @@
+---
+- name: Configure HashiCorp Vault for Breakfix1
+  hosts: hashicorp_vault
+  become: true
+  gather_facts: false
+  vars:
+    aap_host: "controller.example.com"
+    aap_user: "admin"
+    aap_password: "redhat"
+    vault_host: "vault.example.com"
+  tasks:
+    - name: Read the contents of Vault CA cert
+      ansible.builtin.slurp:
+        src: "/opt/vault/tls/vault_ca.pem"
+      register: vault_ca
+
+    - name: Enable SSH secrets engine
+      ansible.builtin.command: bash -c "source .bashrc; vault secrets enable -path=ssh-client-signer ssh"
+      ignore_errors: true
+
+    - name: Configure Vault with a CA for signing client keys
+      ansible.builtin.command: bash -c "source .bashrc; vault write ssh-client-signer/config/ca generate_signing_key=true"
+      ignore_errors: true
+
+    - name: Copy role and policy files to vault server
+      ansible.builtin.copy:
+        src: "{{ item }}"
+        dest: "{{ item }}"
+        owner: root
+        group: root
+        mode: 0644
+      loop:
+        - devops-role.json
+        - devops-policy.hcl
+
+    - name: Create a devops Vault role for signing client keys
+      ansible.builtin.command: bash -c "source .bashrc; vault write ssh-client-signer/roles/devops-role @devops-role.json"
+
+    - name: Create a devops vault policy
+      ansible.builtin.command: bash -c "source .bashrc; vault policy write devops-policy devops-policy.hcl"
+
+    - name: Enable the AppRole auth method
+      ansible.builtin.command: bash -c "source .bashrc; vault auth enable approle"
+      ignore_errors: true
+
+    - name: Create a AppRole role and associate with devops-policy
+      ansible.builtin.command: bash -c "source .bashrc; vault write auth/approle/role/devops-role token_policies=devops-policy"
+
+    - name: Fetch role_id from devops-role
+      ansible.builtin.command: bash -c "source .bashrc; vault read auth/approle/role/devops-role/role-id"
+      register: approle_role_id
+
+    - name: Fetch secret_id from devops-role
+      ansible.builtin.command: bash -c "source .bashrc; vault write -f auth/approle/role/devops-role/secret-id"
+      register: approle_secret_id
+
+    - name: Set role_id and secret_id facts
+      ansible.builtin.set_fact:
+        role_id: "{{ approle_role_id['stdout'] | from_json }}"
+        secret_id: "{{ approle_secret_id['stdout'] | from_json }}"
+
+    - name: Import client playbook
+      ansible.builtin.import_tasks: client_configure.yml
+      delegate_to: "{{ groups['client'][0] }}"
+      vars:
+        ansible_password: "redhat"
+
+    - name: Write user public key to /tmp
+      ansible.builtin.copy:
+        content: "{{ devops_pub_key }}"
+        dest: /tmp/devops_pub_key
+
+    - name: Sign user public key using Vault CA
+      ansible.builtin.command: >
+        bash -c "source .bashrc; vault write -format=table -field=signed_key ssh-client-signer/sign/devops-role public_key=@/tmp/devops_pub_key"
+      register: signed_pub_key
+
+    - name: Import aap configure playbook
+      ansible.builtin.import_tasks: aap_configure.yml

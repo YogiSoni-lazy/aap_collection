@@ -1,0 +1,121 @@
+---
+- name: Set controller user fact
+  ansible.builtin.set_fact:
+    controller_user: "{{ (user_name is defined) | ternary(user_name, awx_user_name) }}"
+    user_fullname: "{{ awx_user_first_name }} {{ awx_user_last_name }}"
+
+- name: Set user_folder_name fact
+  ansible.builtin.set_fact:
+    user_folder_name: "{{ vcenter_server['datacenter'] }}/vm/{{ vcenter_server['parent_folder'] }}/{{ controller_user }}"
+
+- name: Find all user VMs
+  community.vmware.vmware_vm_info:
+    hostname: "{{ vcenter_server['hostname'] }}"
+    username: "{{ vcenter_server['username'] }}"
+    password: "{{ vcenter_password }}"
+    folder: "{{ user_folder_name }}"
+    show_attribute: true
+  register: user_vms
+
+- name: Find user VM properties from vCenter
+  community.vmware.vmware_guest_info:
+    hostname: "{{ vcenter_server['hostname'] }}"
+    username: "{{ vcenter_server['username'] }}"
+    password: "{{ vcenter_password }}"
+    datacenter: "{{ vcenter_server['datacenter'] }}"
+    schema: "vsphere"
+    properties: ["config.createDate"]
+    moid: "{{ user_vms['virtual_machines'][0]['moid'] }}"
+  register: vmguest
+  when: user_vms['virtual_machines']|length
+
+- name: Find VM created date fact
+  ansible.builtin.set_fact:
+    created_date: "{{ vmguest['instance']['config']['createDate'] }}"
+    total_days: "{{ expiration['max_days']|int + expiration['extend_days']|int }}"
+    new_reminder1: "{{ expiration['first_reminder']|int + expiration['extend_days']|int }}"
+    new_reminder2: "{{ expiration['second_reminder']|int + expiration['extend_days']|int }}"
+  when:
+    - vmguest is defined
+    - vmguest['instance'] is defined
+    - vmguest['instance']['config'] is defined
+
+- name: Set created and expiry fact
+  ansible.builtin.set_fact:
+    reminder1_date: "{{ lookup('pipe', 'TZ=' + timezone + ' date -d ' + '\"' + created_date + ' ' + new_reminder1 + ' days\" +\"%Y-%m-%d %T\"') }}"
+    reminder2_date: "{{ lookup('pipe', 'TZ=' + timezone + ' date -d ' + '\"' + created_date + ' ' + new_reminder2 + ' days\" +\"%Y-%m-%d %T\"') }}"
+    expiry_date: "{{ lookup('pipe', 'TZ=' + timezone + ' date -d ' + '\"' + created_date + ' ' + total_days + ' days\" +\"%Y-%m-%d %T\"') }}"
+    first_expiry_epoch: "{{ lookup('pipe', 'TZ=' + timezone + ' date -d ' + '\"' + created_date + ' ' + expiration['first_reminder'] + ' days\" +\" %s\"') }}"
+    second_expiry_epoch: "{{ lookup('pipe', 'TZ=' + timezone + ' date -d ' + '\"' + created_date + ' ' + expiration['second_reminder'] + ' days\" +\" %s\"') }}"
+    new_expiry_epoch: "{{ lookup('pipe', 'TZ=' + timezone + ' date -d ' + '\"' + created_date + ' ' + total_days + ' days\" +\" %s\"') }}"
+    scenario: "{{ user_vms['virtual_machines'][0]['attributes']['scenario'] }}"
+  when:
+    - vmguest is defined
+    - vmguest['instance']|length
+
+- name: Export facts for sending email
+  ansible.builtin.set_stats:
+    data:
+      user_fullname: "{{ user_fullname }}"
+      new_expiry_date: "{{ lookup('pipe', 'TZ=' + timezone + ' date -d \"' + expiry_date + '\"') }}"
+      scenario: "{{ user_vms['virtual_machines'][0]['attributes']['scenario'] }}"
+  when:
+    - vmguest is defined
+    - vmguest['instance']|length
+
+- name: Modify first schedule with new expiration details
+  awx.awx.schedule:
+    name: "{{ controller_user }}_reminder1"
+    extra_data:
+      {
+        "user_name": "{{ controller_user }}",
+        "user_fullname": "{{ user_fullname }}",
+        "scenario": "{{ scenario }}",
+        "reminder_alert": "one"
+      }
+    state: present
+    enabled: true
+    unified_job_template: "Automation - email Expiration"
+    rrule: "{{ query('awx.awx.schedule_rrule', 'none', start_date=reminder1_date, timezone=timezone) }}"
+    controller_host: "{{ awxlab_controller_hostname }}"
+    controller_username: "{{ awxlab_controller_super_user }}"
+    controller_password: "{{ awxlab_controller_password }}"
+    validate_certs: false
+  when: first_expiry_epoch|int > ansible_date_time['epoch']|int
+
+- name: Modify second schedule with new expiration details
+  awx.awx.schedule:
+    name: "{{ controller_user }}_reminder2"
+    extra_data:
+      {
+        "user_name": "{{ controller_user }}",
+        "user_fullname": "{{ user_fullname }}",
+        "scenario": "{{ scenario }}",
+        "reminder_alert": "two"
+      }
+    state: present
+    enabled: true
+    unified_job_template: "Automation - email Expiration"
+    rrule: "{{ query('awx.awx.schedule_rrule', 'none', start_date=reminder2_date, timezone=timezone) }}"
+    controller_host: "{{ awxlab_controller_hostname }}"
+    controller_username: "{{ awxlab_controller_super_user }}"
+    controller_password: "{{ awxlab_controller_password }}"
+    validate_certs: false
+  when: second_expiry_epoch|int > ansible_date_time['epoch']|int
+
+- name: Modify delete schedule with new expiration details
+  awx.awx.schedule:
+    name: "{{ controller_user }}_vms_destroy"
+    extra_data:
+      {
+        "user_name": "{{ controller_user }}",
+        "delete_confirmation": true
+      }
+    state: present
+    enabled: true
+    unified_job_template: "Automation - Destroy VMs"
+    rrule: "{{ query('awx.awx.schedule_rrule', 'none', start_date=expiry_date, timezone=timezone) }}"
+    controller_host: "{{ awxlab_controller_hostname }}"
+    controller_username: "{{ awxlab_controller_super_user }}"
+    controller_password: "{{ awxlab_controller_password }}"
+  when: new_expiry_epoch|int > ansible_date_time['epoch']|int

@@ -1,0 +1,7 @@
+---
+- name: Generate Self-signed Certs for Ansible LB Server
+  hosts: aap_lb
+  gather_facts: true
+  become: true
+  roles:
+    - role: nshaik.aap_collection.generate_self_signed_certs

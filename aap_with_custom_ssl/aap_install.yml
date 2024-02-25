@@ -1,0 +1,26 @@
+---
+- name: Download and Install AAP2
+  hosts: aap_controller[0]
+  become: true
+  vars_files: 
+    - variables.yml
+  pre_tasks:
+    - name: Copy ssl_certs directory to controller
+      ansible.builtin.copy:
+        src: /root/ssl_certs/
+        dest: /root/ssl_certs/
+        owner: root
+        group: root
+        mode: preserve
+  
+    - name: Copy Root CA to controller
+      ansible.builtin.copy:
+        src: /root/ca_certs/cacert.crt
+        dest: /root/ssl_certs/rootca.crt
+        owner: root
+        group: root
+        mode: preserve
+  roles:
+    - infra.aap_utilities.aap_setup_download
+    - infra.aap_utilities.aap_setup_prepare
+    - infra.aap_utilities.aap_setup_install

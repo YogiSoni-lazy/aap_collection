@@ -1,0 +1,90 @@
+---
+### Variables related to Vagrant setup ###
+ctrl_name: "controller"
+ctrl_ip: "172.25.123.60"
+exec_node_name: "execnode"
+domain: "example.com"
+libvirt_bridge: "internal"
+exec_nodes: 2
+memory: 9000
+cpus: 2
+  #vault_password_file: "/root/.vault_pass"
+
+### Variables for AAP2 setup ###
+### Create activation key here https://console.redhat.com/insights/connector/activation-keys
+### and replace below rhsm_ak_name and rhsm_org_id variables values
+rhsm_org_id: 1979710
+rhsm_ak_name: "newkey2"
+aap_rhsm_pool_id: "8a85f9a07db4828b017dc517f8d6085b"
+### Generate an RHSM API token from https://access.redhat.com/management/api and
+### add it to aap_setup_down_offline_token variable values
+aap_setup_down_offline_token: "eyJhbGciOiJIUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJhZDUyMjdhMy1iY2ZkLTRjZjAtYTdiNi0zOTk4MzVhMDg1NjYifQ.eyJpYXQiOjE3MDg3NzUxNjIsImp0aSI6IjQ2MTkwNDA2LTg5N2YtNDE3MS1iZDg3LWQwYWY4MjFlMTVmNiIsImlzcyI6Imh0dHBzOi8vc3NvLnJlZGhhdC5jb20vYXV0aC9yZWFsbXMvcmVkaGF0LWV4dGVybmFsIiwiYXVkIjoiaHR0cHM6Ly9zc28ucmVkaGF0LmNvbS9hdXRoL3JlYWxtcy9yZWRoYXQtZXh0ZXJuYWwiLCJzdWIiOiJmOjUyOGQ3NmZmLWY3MDgtNDNlZC04Y2Q1LWZlMTZmNGZlMGNlNjpyaG4tc3VwcG9ydC15c29uaSIsInR5cCI6Ik9mZmxpbmUiLCJhenAiOiJyaHNtLWFwaSIsInNlc3Npb25fc3RhdGUiOiI0NjIwYmU3Ni0zMTdmLTRkMjAtYThkYi0xMTZlZjYzZjQ3MzEiLCJzY29wZSI6Im9mZmxpbmVfYWNjZXNzIiwic2lkIjoiNDYyMGJlNzYtMzE3Zi00ZDIwLWE4ZGItMTE2ZWY2M2Y0NzMxIn0.Nkq2bwD7FqiyOOKsAtnutDzi3XyXGS_LLt98oC6eK-A"
+aap_setup_down_version: "2.4"
+aap_setup_down_type: "setup"
+aap_setup_rhel_version: "9"
+aap_setup_prep_inv_nodes:
+  automationcontroller: "{{ groups['aap_controller'] }}"
+  execution_nodes: "{{ groups['aap_exec_node'] }}"
+aap_setup_prep_inv_vars:
+  automationcontroller: # denotes the automation controller nodes as hybrid nodes (controller and execution)
+    node_type: hybrid
+    peers: execution_nodes
+    ignore_preflight_errors: true
+  execution_nodes:
+    node_type: execution
+  all:
+    pg_database: "awx"
+    pg_username: "awx"
+    pg_sslmode: "prefer"  # set to 'verify-full' for client-side enforced SSL
+    registry_url: "registry.redhat.io"
+    receptor_listener_port: 27199
+aap_setup_prep_inv_secrets:
+  all:
+    ### Generate a Registry token from https://access.redhat.com/terms-based-registry/accounts and
+    ### replace the below values for registry_username and registry_password
+    registry_username: "1979710|-----------------------------------------------------------------------------------------------------------------------abc"
+    registry_password: "eyJhbGciOiJSUzUxMiJ9.eyJzdWIiOiI5NThjN2MyYTlmM2M0MTE5YTUwZWU4YTc0MGU5MDc3ZiJ9.bu78uyi2geqiSe7Noo-sEbW31todlD_vDP1iKTTQvGovnw93ZRNHhoeMmK4k3qjylDgDpydxNDggRvDMhNIfPdx89ZV61zjQ6yuyUg8ZJ7wugEUmRHrlRV224ZNBONJ9JQKHLbWu10G5j1Xj4i9nrHuidUsdjn5Pe1mmtwfSDsTy4Bhkpg9pKtKOq-MbZp1G7hY9JPoy-_Ie3a6rO8A803m1Xrh8WykRkPK3tcP6d6-PX5_kdNbqzca7TkUpnE9L81xvK5HrL4X0LX8WnFwYMWn8sO6XrNVrlfTZVOnUG2CpV8rDxecjxU4ilCaQZTEqcctQz0zg1oAmz6KBd4y05fcMx_0LtyRI-A4eBIl9SnAunqzNymGeIXrPYox5N-JPfg87LBGRRs9MIpsHgKTroqLlQEn4ztNjkA7E9s2ae5JD04SAoH1Tvgx_mwTaTPOZv5Q8tncwFm3Ec8hr-K_d1X7_MmAwGttBq3stqkTz8qcC5rVcS1A3TODTUP95HBCbz-U8-2aES8bkNnPs3iP2NbLZDiZn1Mn02eBm-w3u1w__epWc_meiqdTbfnv_PRpW8LZMAasV70S1B1lB4yN1Y5Go3mpE5X_4Nigzfvz21z_4gaOnllDlJ2tIYvAR5RfAQgSdroqEWnaHex87SmjmQUTc0cVqCL1xcTscbRdyAzg"
+    admin_password: redhat
+    pg_password: redhat
+controller_hostname: "{{ (aap_setup_prep_inv_nodes['automationcontroller'] | list)[0] }}.{{ domain }}"
+controller_validate_certs: false
+ssh_pub_key: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDPTk2O+VaTPPAfymligH8IN3jG6ewgLACIRBNC3QvqFMf73cF3GUP09laWMOM7ubI6lo7bPbRc2hUEheW6NWVjhLeykpLr9y/EFY+mTjuU5i8e5Sfq2bNxYNaCbEVeS7D/dgjSUBVXrisRaJKlgd/PkorrMoNp+STK4gqcdaVMhdC1VAYWa2vycaXGNumDiJfKxs1cpjAUqCGfrjLg4kk/Uo7FmzxyODyAujoBllJNPgRTPRanvhTyQOTtRRCokv6uXdlUPe909B8hixe6t9FWvOhKzLV91VvxirBhhKzfVF01LOeoWzhJ0Yy2SDB2J+PUBz2JR96Aa0/A36iwd64CiIgmiQRPEO+fenMIUQINmaDL7zjyKkgzBVspYAtsGIB7lUmZcPCbYQDfXQAAzwPqCUpobKE1OaqBBZiRAufPo1rZE4OSe6gBLowFOCuvI6G0FcSpk9ZM8YQV5hnaoH1DcPOGEYXXRT1aI3obNzGl9Z0tdtWZzfndWCH58nnsczc= yogita@lappy"
+awx_user_name: awx
+ssh_private_key: "-----BEGIN OPENSSH PRIVATE KEY-----
+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
+-----END OPENSSH PRIVATE KEY-----"

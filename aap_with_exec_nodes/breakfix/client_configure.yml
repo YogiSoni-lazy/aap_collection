@@ -1,0 +1,48 @@
+---
+- name: Create devops user and generate SSH keys
+  ansible.builtin.user:
+    name: devops
+    shell: /bin/bash
+    generate_ssh_key: yes
+    ssh_key_bits: 2048
+    ssh_key_file: .ssh/id_rsa
+  register: user_data
+
+- name: Add vault public key to client SSH configuration
+  ansible.builtin.get_url:
+    url: https://vault.example.com:8200/v1/ssh-client-signer/public_key
+    dest: /etc/ssh/trusted-user-ca-keys.pem
+    validate_certs: false
+    owner: root
+    group: root
+    mode: 0644
+
+- name: Add TrustedUserCAKeys line to sshd_config
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: "^TrustedUserCAKeys"
+    line: "TrustedUserCAKeys /etc/ssh/trusted-user-ca-keys.pem"
+    owner: root
+    group: root
+    mode: 0644
+  register: sshd_conf
+
+- name: Set SSH public key file as fact
+  ansible.builtin.set_fact:
+    devops_pub_key: "{{ user_data['ssh_public_key'] }}"
+
+- name: Read SSH private key
+  ansible.builtin.slurp:
+    src: "/home/devops/.ssh/id_rsa"
+  register: devops_private_key
+
+- name: Set SSH Private key fact
+  ansible.builtin.set_fact:
+    ssh_private_key: "{{ devops_private_key['content'] | b64decode }}" 
+
+- name: Restart sshd service
+  ansible.builtin.service:
+    name: sshd
+    state: restarted
+    enabled: true
+  when: sshd_conf['changed']

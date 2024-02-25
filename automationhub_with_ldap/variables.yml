@@ -1,0 +1,67 @@
+---
+### Variables related to Vagrant setup ###
+ah_name: "automationhub"
+ah_ip: "172.25.123.90"
+ldap_name: "ldap"
+ldap_ip: "172.25.123.91"
+domain: "example.com"
+libvirt_bridge: "internal"
+memory: 4096
+cpus: 2
+vault_password_file: "/root/.vault_pass"
+
+### Variables for Automation Hub setup ###
+### Create activation key here https://console.redhat.com/insights/connector/activation-keys
+### and replace below rhsm_ak_name and rhsm_org_id variables values
+rhsm_org_id: 1234567
+rhsm_ak_name: "my-ak"
+### Generate an RHSM API token from https://access.redhat.com/management/api and
+### add it to aap_setup_down_offline_token variable values
+aap_setup_down_offline_token: "eyJhbGciOiJIUxxxxx"
+aap_setup_down_version: "2.4"
+aap_setup_down_type: "setup"
+aap_setup_rhel_version: "9"
+aap_setup_prep_inv_nodes:
+  automationhub: "{{ groups['aap_ah'] }}"
+aap_setup_prep_inv_vars:
+  automationhub:
+    ignore_preflight_errors: true
+    automationhub_authentication_backend: "ldap"
+    automationhub_ldap_server_uri: "'ldap://{{ ldap_name }}.{{ domain }}:389'"
+    automationhub_ldap_bind_dn: "'uid=admin,cn=users,cn=accounts,dc=example,dc=com'"
+    automationhub_ldap_bind_password: !vault |
+          $ANSIBLE_VAULT;1.1;AES256
+          30326466323238363061346662393364636264323139636537313433616566663164306166306663
+          3731386132316430663232323639353737656639613062330a306238363164653939393033353961
+          35356666366361393834316135643130353736386335663661366530613932646163333336653432
+          6137373635623665310a366534626339663831363364326533316330666434343861666664623537
+          6332
+    automationhub_ldap_user_search_base_dn: "'cn=users,cn=accounts,dc=example,dc=com'"
+    automationhub_ldap_group_search_base_dn: "'cn=groups,cn=accounts,dc=example,dc=com'"
+  all:
+    automationhub_pg_database: "automationhub"
+    automationhub_pg_username: "automationhub"
+    automationhub_pg_sslmode: "prefer"
+    registry_url: "registry.redhat.io"
+aap_setup_prep_inv_secrets:
+  all:
+    automationhub_admin_password: !vault |
+          $ANSIBLE_VAULT;1.1;AES256
+          63323733373839306434353930343338363564393730386566633838323861383336393465356661
+          3663656163323430336337366537303762663030383663390a386233613639386565313261633635
+          37393164386163303130616463356238326337663463636238636431393439663835393836353933
+          3831306466313663370a353037633063643638626434636462333239356132646431393364363232
+          3237
+    automationhub_pg_password: !vault |
+          $ANSIBLE_VAULT;1.1;AES256
+          63323733373839306434353930343338363564393730386566633838323861383336393465356661
+          3663656163323430336337366537303762663030383663390a386233613639386565313261633635
+          37393164386163303130616463356238326337663463636238636431393439663835393836353933
+          3831306466313663370a353037633063643638626434636462333239356132646431393364363232
+          3237
+    ### Generate a Registry token from https://access.redhat.com/terms-based-registry/accounts and
+    ### replace the below values for registry_username and registry_password
+    registry_username: "token_user"
+    registry_password: "eyJhbGciOiJSUzUxxxxx"
+controller_hostname: "{{ (aap_setup_prep_inv_nodes['automationcontroller'] | list)[0] }}.{{ domain }}"
+controller_validate_certs: false

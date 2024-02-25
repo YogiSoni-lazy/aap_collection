@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+
+<p></p>
+
+<p>Dear <b>{{ user_fullname }},</b></p>
+<p>    Hope you are doing great.</p>
+<p>    Just sending you a gentle reminder to check on the status of the deployed VMs.</p>
+
+<table width='40%'>
+  <tr>
+    <td><strong>System Owner:</strong></td> <td>{{ user_fullname }}</td>
+  </tr>
+  <tr>
+    <td><strong>Build Date:</strong></td> <td>{{ vm_created_date }}</td>
+  </tr>
+  <tr>
+    <td><strong>Expiry Date:</strong></td> <td>{{ vm_expiry_date }}</td>
+  </tr>
+  <tr>
+    <td><strong>Reminder Alert:</strong></td> <td>{{ reminder_alert | capitalize }}</td>
+  </tr>
+</table>
+
+<br>
+
+<h3>Your instance details are as follows</h3>
+<table width='70%' border='1' cellpadding='4' style='border:1px solid black; border-collapse:collapse'>
+  {{ (reminder_alert == 'one')|ternary("<tr style='background-color:powderblue'>","<tr style='background-color:coral'>") }}
+  <th>SYSTEM ROLE</th> <th>HOSTNAME</th> <th>IP ADDRESS</th></tr>
+  {% if scenario == "aap_cluster_with_haproxy" %}
+    {% for n in '1', '2' %}
+      <tr>
+        <td align="center">AAP Controller{{ n }}</td>
+        <td align="center">{{ lookup('vars', 'aap_controller' + n + '_hostname') }}</td>
+        <td align="center">{{ lookup('vars', 'aap_controller' + n + '_ipaddress') }}</td>
+      </tr>
+    {% endfor %}
+  {% endif %}
+  {% if aap_controller_hostname is defined %}
+    <tr>
+      <td align="center">AAP Controller</td>
+      <td align="center">{{ aap_controller_hostname }}</td>
+      <td align="center">{{ aap_controller_ipaddress }}</td>
+    </tr>
+  {% endif %}
+  {% if aap_hub_hostname is defined %}
+    <tr>
+      <td align="center">Automation Hub</td>
+      <td align="center">{{ aap_hub_hostname }}</td>
+      <td align="center">{{ aap_hub_ipaddress }}</td>
+    </tr>
+  {% endif %}
+  {% if aap_eda_hostname is defined %}
+    <tr>
+      <td align="center">EDA Controller</td>
+      <td align="center">{{ aap_eda_hostname }}</td>
+      <td align="center">{{ aap_eda_ipaddress }}</td>
+    </tr>
+  {% endif %}
+  {% if aap_db_hostname is defined %}
+    <tr>
+      <td align="center">AAP External DB</td>
+      <td align="center">{{ aap_db_hostname }}</td>
+      <td align="center">{{ aap_db_ipaddress }}</td>
+    </tr>
+   {% endif %}
+  {% if aap_lb_hostname is defined %}
+    <tr>
+      <td align="center">LB (HAProxy) Server</td>
+      <td align="center">{{ aap_lb_hostname }}</td>
+      <td align="center">{{ aap_lb_ipaddress }}</td>
+    </tr>
+   {% endif %}
+</table>
+
+<br>
+
+<h3><img src="https://drive.google.com/uc?export=view&id=1ib71yS44VFwNf0ew5Xu-O_btio4-77po" width="50px" height="50px" style="vertical-align:middle;margin:25px 5px""/>What's Next?</h3>
+  <p>I'm sure you must be really busy and doing an awesome job as always. Hope you can find a few minutes to peform the following actions from your end.
+    <li>You can delete the above listed instances if you aren't using it, by running <strong>Delete deployed AAP Setup</strong> template.</li>
+    <li>Your instances will automatically be deleted with in next {{ (reminder_alert == "one")|ternary((expiration['max_days']|int - expiration['first_reminder']|int),(expiration['max_days']|int - expiration['second_reminder']|int)) }} day(s).</li>
+    <li>You can extend the expiry of these VMs by another {{ expiration['extend_days']|int }} days once, run <b>Extend expiration of VMs</b> template for extending the expiry.</li>
+  </p>
+
+<br>
+
+  <hr></hr>
+  <strong>A big THANK YOU to all the hard-working Support Engineers out there! You guys are AWESOME.</strong>
+
+</html>

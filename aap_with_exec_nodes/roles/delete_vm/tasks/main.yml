@@ -1,0 +1,63 @@
+---
+- name: Set controller user fact
+  ansible.builtin.set_fact:
+    controller_user: "{{ (user_name is defined) | ternary(user_name,awx_user_name) }}"
+
+- name: Set user_folder_name fact
+  ansible.builtin.set_fact:
+    user_folder_name: "{{ vcenter_server['datacenter'] }}/vm/{{ vcenter_server['parent_folder'] }}/{{ controller_user }}"
+
+- name: Find all user VMs
+  community.vmware.vmware_vm_info:
+    hostname: "{{ vcenter_server['hostname'] }}"
+    username: "{{ vcenter_server['username'] }}"
+    password: "{{ vcenter_password }}"
+    folder: "{{ user_folder_name }}"
+    show_attribute: yes
+  register: user_vms
+
+- name: Remove all user VMs
+  community.vmware.vmware_guest:
+    hostname: "{{ vcenter_server['hostname'] }}"
+    username: "{{ vcenter_server['username'] }}"
+    password: "{{ vcenter_password }}"
+    datacenter: "{{ vcenter_server['datacenter'] }}"
+    folder: "{{ user_folder_name }}"
+    name: "{{ item['guest_name'] }}"
+    state: absent
+    force: yes
+  loop: "{{ user_vms['virtual_machines'] }}"
+  when: user_vms['virtual_machines']|length
+
+- name: Find schedule names for VMs
+  ansible.builtin.set_fact:
+    first_schedule_name: "{{ controller_user }}_reminder1"
+    second_schedule_name: "{{ controller_user }}_reminder2"
+    delete_schedule_name: "{{ controller_user }}_vms_destroy"
+
+- name: Cleanup first schedule
+  awx.awx.schedule:
+    name: "{{ first_schedule_name }}"
+    state: absent
+    controller_host: "{{ awxlab_controller_hostname }}"
+    controller_username: "{{ awxlab_controller_super_user }}"
+    controller_password: "{{ awxlab_controller_password }}"
+    validate_certs: false
+
+- name: Cleanup second schedule
+  awx.awx.schedule:
+    name: "{{ second_schedule_name }}"
+    state: absent
+    controller_host: "{{ awxlab_controller_hostname }}"
+    controller_username: "{{ awxlab_controller_super_user }}"
+    controller_password: "{{ awxlab_controller_password }}"
+    validate_certs: false
+
+- name: Cleanup delete schedule
+  awx.awx.schedule:
+    name: "{{ delete_schedule_name }}"
+    state: absent
+    controller_host: "{{ awxlab_controller_hostname }}"
+    controller_username: "{{ awxlab_controller_super_user }}"
+    controller_password: "{{ awxlab_controller_password }}"
+    validate_certs: false

@@ -1,0 +1,10 @@
+---
+collections:
+  - name: https://github.com/snagoor/aap_common.git
+    type: git
+    version: main
+  - name: ansible.posix
+  - name: community.crypto
+  - name: community.general
+  - name: infra.aap_utilities
+  - name: awx.awx

@@ -1,0 +1,58 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+### Load variables from the config file ###
+config_file = File.join(File.dirname(__FILE__), "variables.yml")
+vars = YAML.load_file(config_file)
+
+rhel_version = vars['aap_setup_rhel_version']
+
+Vagrant.configure("2") do |config|
+  ### Global Configuration  ###
+  config.vm.box = "nshaik/rhel" + rhel_version
+  config.vm.box_url = "http://content.syslab.pnq2.redhat.com/content/aap/rhel" + rhel_version + "/metadata.json"
+  config.vm.provider "libvirt" do |libvirt|
+    libvirt.default_prefix = vars['vm_prefix'] || ""
+    libvirt.memory = vars['memory']
+    libvirt.cpus = vars['cpus']
+  end
+
+  ### Configuration related to AAP Controller ###
+  config.vm.define vars['ctrl_name'] do |controller|
+    controller.vm.hostname = "#{vars['ctrl_name']}.#{vars['domain']}"
+    controller.vm.network "private_network", ip: vars['ctrl_ip'], name: vars['libvirt_bridge']
+    controller.vm.provision "shell", inline: <<-SHELL
+      echo "aap_controller" | tee /etc/server_role
+    SHELL
+  end
+
+  ### Configuration related to RH SSO ###
+  config.vm.define vars['sso_name'] do |sso|
+    sso.vm.box = "nshaik/rhel8"
+    sso.vm.box_url = "http://content.syslab.pnq2.redhat.com/content/aap/rhel8/metadata.json"
+    sso.vm.hostname = "#{vars['sso_name']}.#{vars['domain']}"
+    sso.vm.network  "private_network", ip: vars['sso_ip'], name: vars['libvirt_bridge']
+    sso.vm.provision "shell", inline: <<-SHELL
+      echo "sso_server" | tee /etc/server_role
+    SHELL
+  end
+
+  ### Configuration related to FreeIPA server ###
+  config.vm.define vars['ldap_name'] do |ldap|
+    ldap.vm.hostname = "#{vars['ldap_name']}.#{vars['domain']}"
+    ldap.vm.network  "private_network", ip: vars['ldap_ip'], name: vars['libvirt_bridge']
+    ldap.vm.provision "shell", inline: <<-SHELL
+      echo "ldap_server" | tee /etc/server_role
+    SHELL
+    ldap.vm.provision "ansible" do |ansible|
+      ansible.compatibility_mode = "2.0"
+      ansible.limit = "all"
+      ansible.inventory_path = "vagrant.py"
+      ansible.playbook = "site.yml"
+      ansible.verbose = "vv"
+      if !vars['vault_password_file'].nil?
+        ansible.vault_password_file = vars['vault_password_file']
+      end
+    end
+  end
+end

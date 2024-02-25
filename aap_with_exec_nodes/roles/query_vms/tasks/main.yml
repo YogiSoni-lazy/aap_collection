@@ -1,0 +1,105 @@
+---
+- name: Set scenario fact
+  ansible.builtin.set_fact:
+    scenario: "{{ selected_scenario | lower | replace(' ', '_') }}"
+
+- name: Set user full name fact
+  ansible.builtin.set_fact:
+    user_fullname: "{{ awx_user_first_name }} {{ awx_user_last_name }}"
+
+- name: Import VMware Access Role
+  ansible.builtin.import_role:
+    name: nshaik.aap.access
+
+- name: Set user_folder_name fact
+  ansible.builtin.set_fact:
+    user_folder_name: "{{ vcenter_server['datacenter'] }}/vm/{{ vcenter_server['parent_folder'] }}/{{ awx_user_name }}"
+
+- name: Create user folder on vCenter
+  community.vmware.vcenter_folder:
+    hostname: "{{ vcenter_server['hostname'] }}"
+    username: "{{ vcenter_server['username'] }}"
+    password: "{{ vcenter_password }}"
+    datacenter_name: "{{ vcenter_server['datacenter'] }}"
+    folder_name: "{{ awx_user_name }}"
+    parent_folder: "{{ vcenter_server['parent_folder'] }}"
+    folder_type: "{{ vcenter_server['folder_type'] }}"
+    state: present
+
+- name: Find all user VMs
+  community.vmware.vmware_vm_info:
+    hostname: "{{ vcenter_server['hostname'] }}"
+    username: "{{ vcenter_server['username'] }}"
+    password: "{{ vcenter_password }}"
+    folder: "{{ user_folder_name }}"
+    show_attribute: yes
+  register: user_vms
+
+- name: Gather VM information from vCenter
+  community.vmware.vmware_guest_info:
+    name: "{{ user_vms['virtual_machines'][0]['guest_name'] }}"
+    hostname: "{{ vcenter_server['hostname'] }}"
+    username: "{{ vcenter_server['username'] }}"
+    password: "{{ vcenter_password }}"
+    datacenter: "{{ vcenter_server['datacenter'] }}"
+    folder: "{{ user_folder_name }}"
+    tags: yes
+  register: user_vm
+  when: user_vms['virtual_machines']|length
+
+- name: Set AAP deployment facts
+  ansible.builtin.set_fact:
+    aap_version_deployed: "{{ user_vm['instance']['customvalues']['aap_version'] }}"
+    scenario_deployed: "{{ user_vm['instance']['customvalues']['scenario'] }}"
+    is_setup_lb: "{{ user_vm['instance']['customvalues']['setup_lb'] }}"
+    rhel_version_deployed: "{{ user_vm['instance']['customvalues']['rhel_version'] }}"
+    current_setup: "{{ ('haproxy' in scenario) | ternary(true, false)  }}"
+  when:
+    - user_vm is defined
+    - user_vm['instance']['customvalues']['aap_version'] is defined
+
+- name: Preserve current deployed version
+  ansible.builtin.set_stats:
+    data:
+      aap_version_deployed: "{{ aap_version_deployed }}"
+  when:
+    - user_vm is defined
+    - user_vm['instance']['customvalues']['aap_version'] is defined
+
+- name: Set compliance fact when no user VMs exists
+  ansible.builtin.set_fact:
+    version_mismatch: False
+  when: not user_vm['instance'] is defined
+
+- name: Find version mismatch when user VMs exits
+  ansible.builtin.set_fact:
+    version_mismatch: >-
+      {{ ((aap_version_deployed is defined and aap_version != aap_version_deployed) or
+      (scenario_deployed != scenario) or (is_setup_lb != current_setup)) or (rhel_version|int != rhel_version_deployed|int) }}
+  when: user_vm['instance'] is defined
+
+- name: Export facts
+  ansible.builtin.set_stats:
+    data:
+      user_fullname: "{{ user_fullname }}"
+      user_folder_name: "{{ user_folder_name }}"
+      version_mismatch: "{{ version_mismatch }}"
+      scenario: "{{ scenario }}"
+
+- name: Email version mismatch information
+  community.general.mail:
+    host: "{{ smtp_host }}"
+    port: "{{ smtp_port }}"
+    subject: "FAILED: Incorrect version selected or previous setup detected"
+    body: "{{ lookup('template', 'email_body_mismatch.j2') }}"
+    from: "Ansible Admin <no-reply@{{ awxlab_controller_hostname }}>"
+    to: "{{ awx_user_email }}"
+    charset: utf8
+    subtype: html
+  when: version_mismatch
+
+- name: Fail when previous build version is not per current choice
+  ansible.builtin.fail:
+    msg: "Previous AAP deployment by {{ awx_user_name }} already exists. Please delete existing VMs before re-provisioning with a different selection"
+  when: version_mismatch
+...

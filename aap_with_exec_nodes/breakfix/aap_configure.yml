@@ -1,0 +1,96 @@
+---
+- name: Create HashiCorp Vault Signed SSH Credential
+  awx.awx.credential:
+    controller_host: "{{ aap_host }}"
+    controller_username: "{{ aap_user }}"
+    controller_password: "{{ aap_password }}"
+    validate_certs: false
+    organization: Default
+    name: "HV Signed SSH Credential"
+    credential_type: "HashiCorp Vault Signed SSH"
+    inputs:
+      url: "https://{{ vault_host }}:8200"
+      cacert: "{{ vault_ca['content'] | b64decode }}"
+      role_id: "{{ role_id['data']['role_id'] }}"
+      secret_id: "{{ secret_id['data']['secret_id'] }}"
+      default_auth_path: "approle"
+
+- name: Create a Machine Credential
+  awx.awx.credential:
+    controller_host: "{{ aap_host }}"
+    controller_username: "{{ aap_user }}"
+    controller_password: "{{ aap_password }}"
+    validate_certs: false
+    organization: Default
+    name: "SSH Credential"
+    credential_type: "Machine"
+    inputs:
+      username: "devops"
+      ssh_key_data: "{{ ssh_private_key }}"
+      ssh_public_key_data: "{{ signed_pub_key['stdout'] }}"
+
+- name: Use HashiCorp SSH Signed Keys Lookup credential
+  awx.awx.credential_input_source:
+    controller_host: "{{ aap_host }}"
+    controller_username: "{{ aap_user }}"
+    controller_password: "{{ aap_password }}"
+    validate_certs: false
+    input_field_name: ssh_public_key_data
+    target_credential: "SSH Credential"
+    source_credential: "HV Signed SSH Credential"
+    metadata:
+      role: "devops-role"
+      public_key: "{{ devops_pub_key }}"
+      secret_path: "ssh-client-signer"
+      valid_principals: "devops"
+    state: present
+
+- name: Create a Static inventory
+  awx.awx.inventory:
+    controller_host: "{{ aap_host }}"
+    controller_username: "{{ aap_user }}"
+    controller_password: "{{ aap_password }}"
+    validate_certs: false
+    organization: Default
+    name: "Static"
+
+- name: Add client to the Static inventory
+  awx.awx.host:
+    controller_host: "{{ aap_host }}"
+    controller_username: "{{ aap_user }}"
+    controller_password: "{{ aap_password }}"
+    validate_certs: false
+    name: "client.example.com"
+    enabled: true
+    inventory: "Static"
+    variables:
+      ansible_host: "172.25.123.14"
+
+- name: Modify the Demo Job Template
+  awx.awx.job_template:
+    controller_host: "{{ aap_host }}"
+    controller_username: "{{ aap_user }}"
+    controller_password: "{{ aap_password }}"
+    validate_certs: false
+    name: "Demo Job Template"
+    credentials:
+      - "SSH Credential"
+    inventory: "Static"
+
+- name: Launch a Demo Job Template
+  awx.awx.job_launch:
+    controller_host: "{{ aap_host }}"
+    controller_username: "{{ aap_user }}"
+    controller_password: "{{ aap_password }}"
+    validate_certs: false
+    job_template: "Demo Job Template"
+  register: job
+
+- name: Wait for job to complete
+  awx.awx.job_wait:
+    controller_host: "{{ aap_host }}"
+    controller_username: "{{ aap_user }}"
+    controller_password: "{{ aap_password }}"
+    validate_certs: false
+    job_id: "{{ job.id }}"
+    timeout: 360

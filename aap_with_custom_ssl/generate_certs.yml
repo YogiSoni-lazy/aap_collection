@@ -1,0 +1,60 @@
+- name: Generate Root CA on the Ansible Control Node
+  hosts: localhost
+  gather_facts: false
+  become: true
+  vars_files:
+    - variables.yml
+  tasks:
+    - name: Create a directory to store Root CA certs
+      ansible.builtin.file:
+        path: /root/ssl_certs/
+        state: directory
+        recurse: true
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Create private key for AAP server
+      community.crypto.openssl_privatekey:
+        path: /root/ssl_certs/{{ aap_fqdn }}.key
+      run_once: true
+
+    - name: Create a new certificate signing request (CSR)
+      community.crypto.openssl_csr_pipe:
+        privatekey_path: /root/ssl_certs/{{ aap_fqdn }}.key
+        subject_alt_name:
+          - "DNS:{{ aap_fqdn }}"
+      run_once: true
+      register: csr
+
+    - name: Check whether certificate exists
+      ansible.builtin.stat:
+        path: /root/ssl_certs/{{ aap_fqdn }}.crt
+      run_once: true
+      register: cert_exists
+
+    - name: Read existing certificate if exists
+      ansible.builtin.slurp:
+        src: /root/ssl_certs/{{ aap_fqdn }}.crt
+      run_once: true
+      register: certificate
+      when: cert_exists['stat']['exists']
+
+    - name: Sign certificate with Root CA
+      community.crypto.x509_certificate_pipe:
+        content: "{{ (certificate.content | b64decode) if cert_exists['stat']['exists'] else omit }}"
+        csr_content: "{{ csr.csr }}"
+        provider: ownca
+        ownca_path: /root/ca_certs/cacert.crt
+        ownca_privatekey_path: /root/ca_certs/cacert.key
+        ownca_not_after: +365d
+        ownca_not_before: "-1d"
+      run_once: true
+      register: sign_cert
+
+    - name: Generate signed certificate file
+      ansible.builtin.copy:
+        dest: /root/ssl_certs/{{ aap_fqdn }}.crt
+        content: "{{ sign_cert['certificate'] }}"
+      run_once: true
+      when: sign_cert['changed']

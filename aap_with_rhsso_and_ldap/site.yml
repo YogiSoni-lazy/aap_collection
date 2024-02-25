@@ -1,0 +1,32 @@
+---
+- name: Run pre-check on AAP2 selection
+  ansible.builtin.import_playbook: precheck.yml
+  tags: aap_precheck
+
+- name: Run common tasks
+  ansible.builtin.import_playbook: common.yml
+  tags: common_tasks
+
+- name: Install Red Hat Ansible Automation Platform
+  ansible.builtin.import_playbook: aap_install.yml
+  tags: aap_install
+
+- name: Attach Subscription to Ansible controller
+  ansible.builtin.import_playbook: license.yml
+  tags: attach_license
+
+- name: Install Red Hat SSO Server
+  ansible.builtin.import_playbook: rhsso_install.yml
+  tags: rhsso_install
+
+- name: Install FreeIPA Server
+  ansible.builtin.import_playbook: freeipa_install.yml
+  tags: freeipa_install
+
+- name: Create Users on FreeIPA Server
+  ansible.builtin.import_playbook: create_ldap_users.yml
+  tags: create_ldap_users
+
+- name: Print details
+  ansible.builtin.import_playbook: print_details.yml
+  tags: print_details

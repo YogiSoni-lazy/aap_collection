@@ -1,0 +1,4 @@
+---
+- name: Configure HashiCorp Vault
+  ansible.builtin.import_playbook: hashicorp_vault_configure.yml
+  tags: hv_configure

@@ -1,0 +1,15 @@
+---
+- name: Copy manifest zip file to the Controller node
+  ansible.builtin.copy:
+    src: manifest_aap.zip
+    dest: manifest_aap.zip
+    mode: "preserve"
+
+- name: Attach manifest to controller
+  awx.awx.license:
+    controller_host: "{{ (scenario == 'aap_cluster_with_haproxy') | ternary(groups['lb'][0], groups['controller'][0]) }}"
+    controller_username: "admin"
+    controller_password: "{{ aap_setup_prep_inv_secrets['all']['admin_password'] }}"
+    manifest: "manifest_aap.zip"
+    validate_certs: false
+...

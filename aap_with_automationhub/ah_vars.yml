@@ -1,0 +1,40 @@
+---
+### Variables for Automation Hub setup ###
+### Generate an RHSM API token from https://access.redhat.com/management/api and
+### add it to aap_setup_down_offline_token variable values
+aap_setup_down_offline_token: "eyJhbGciOiJIUxxxxx"
+aap_setup_down_version: "2.4"
+aap_setup_down_type: "setup"
+aap_setup_rhel_version: "9"
+aap_setup_prep_inv_nodes:
+  automationhub: "{{ groups['aap_ah'] }}"
+aap_setup_prep_inv_vars:
+  automationhub:
+    ignore_preflight_errors: true
+  all:
+    automationhub_pg_database: "automationhub"
+    automationhub_pg_username: "automationhub"
+    automationhub_pg_sslmode: "prefer"
+    registry_url: "registry.redhat.io"
+aap_setup_prep_inv_secrets:
+  all:
+    automationhub_admin_password: !vault |
+          $ANSIBLE_VAULT;1.1;AES256
+          63323733373839306434353930343338363564393730386566633838323861383336393465356661
+          3663656163323430336337366537303762663030383663390a386233613639386565313261633635
+          37393164386163303130616463356238326337663463636238636431393439663835393836353933
+          3831306466313663370a353037633063643638626434636462333239356132646431393364363232
+          3237
+    automationhub_pg_password: !vault |
+          $ANSIBLE_VAULT;1.1;AES256
+          63323733373839306434353930343338363564393730386566633838323861383336393465356661
+          3663656163323430336337366537303762663030383663390a386233613639386565313261633635
+          37393164386163303130616463356238326337663463636238636431393439663835393836353933
+          3831306466313663370a353037633063643638626434636462333239356132646431393364363232
+          3237
+    ### Generate a Registry token from https://access.redhat.com/terms-based-registry/accounts and
+    ### replace the below values for registry_username and registry_password
+    registry_username: "token_user"
+    registry_password: "eyJhbGciOiJSUzUxxxxx"
+ah_hostname: "{{ (aap_setup_prep_inv_nodes['automationhub'] | list)[0] }}.{{ ansible_domain }}"
+ah_validate_certs: false

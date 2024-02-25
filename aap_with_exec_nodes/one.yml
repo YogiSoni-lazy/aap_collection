@@ -1,0 +1,10 @@
+---
+- hosts: localhost
+  tasks:
+    - name: test
+      ansible.builtin.file:
+        path: /etc/some_directory
+        state: directory
+        mode: '0755'
+      when: ansible_fqdn == "lappy"
+...

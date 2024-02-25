@@ -1,0 +1,116 @@
+---
+- name: Create user folder on vCenter
+  community.vmware.vcenter_folder:
+    hostname: "{{ vcenter_server['hostname'] }}"
+    username: "{{ vcenter_server['username'] }}"
+    password: "{{ vcenter_password }}"
+    datacenter_name: "{{ vcenter_server['datacenter'] }}"
+    folder_name: "{{ awx_user_name }}"
+    parent_folder: "{{ vcenter_server['parent_folder'] }}"
+    folder_type: "{{ vcenter_server['folder_type'] | default('vm') }}"
+    state: present
+
+- name: Assign user permission on vCenter
+  community.vmware.vmware_object_role_permission:
+    hostname: "{{ vcenter_server['hostname'] }}"
+    username: "{{ vcenter_server['username'] }}"
+    password: "{{ vcenter_password }}"
+    role: "{{ vcenter_server['access_role'] }}"
+    principal: "{{ awx_user_email }}"
+    object_name: "{{ awx_user_name }}"
+    state: present
+
+# - name: Assign Read-Only permissions on required dvSwitches for user
+#   community.vmware.vmware_object_role_permission:
+#     hostname: "{{ vcenter_server['hostname'] }}"
+#     username: "{{ vcenter_server['username'] }}"
+#     password: "{{ vcenter_password }}"
+#     role: "{{ vcenter_server['access_role'] }}"
+#     principal: "{{ awx_user_email }}"
+#     object_type: "DistributedVirtualSwitch"
+#     object_name: "dv{{ vcenter_network['name'] }}"
+#     state: present
+
+- name: Assign Read-Only permissions on Datacenter
+  community.vmware.vmware_object_role_permission:
+    hostname: "{{ vcenter_server['hostname'] }}"
+    username: "{{ vcenter_server['username'] }}"
+    password: "{{ vcenter_password }}"
+    role: "ReadOnly"
+    principal: "{{ awx_user_email }}"
+    object_type: "Datacenter"
+    object_name: "{{ vcenter_server['datacenter'] }}"
+    recursive: no
+    state: present
+
+- name: Assign required permissions on Cluster
+  community.vmware.vmware_object_role_permission:
+    hostname: "{{ vcenter_server['hostname'] }}"
+    username: "{{ vcenter_server['username'] }}"
+    password: "{{ vcenter_password }}"
+    role: "{{ vcenter_server['access_role'] }}"
+    principal: "{{ awx_user_email }}"
+    object_type: "ClusterComputeResource"
+    object_name: "{{ vcenter_server['cluster'] }}"
+    recursive: no
+    state: present
+
+- name: Assign required permissions on Datastore
+  community.vmware.vmware_object_role_permission:
+    hostname: "{{ vcenter_server['hostname'] }}"
+    username: "{{ vcenter_server['username'] }}"
+    password: "{{ vcenter_password }}"
+    role: "{{ vcenter_server['access_role'] }}"
+    principal: "{{ awx_user_email }}"
+    object_type: "Datastore"
+    object_name: "{{ vcenter_storage['datastore'] }}"
+    recursive: no
+    state: present
+
+# - name: Assign required permissions on dvSwitch Portgroup
+#   community.vmware.vmware_object_role_permission:
+#     hostname: "{{ vcenter_server['hostname'] }}"
+#     username: "{{ vcenter_server['username'] }}"
+#     password: "{{ vcenter_password }}"
+#     role: "{{ vcenter_server['access_role'] }}"
+#     principal: "{{ awx_user_email }}"
+#     object_type: "DistributedVirtualPortgroup"
+#     object_name: "{{ vcenter_network['name'] }}"
+#     recursive: no
+#     state: present
+
+- name: Assign Read-Only permissions on parent folder
+  community.vmware.vmware_object_role_permission:
+    hostname: "{{ vcenter_server['hostname'] }}"
+    username: "{{ vcenter_server['username'] }}"
+    password: "{{ vcenter_password }}"
+    role: "ReadOnly"
+    principal: "{{ awx_user_email }}"
+    object_type: "Folder"
+    object_name: "{{ vcenter_server['parent_folder'].split('/')[1] }}"
+    recursive: no
+    state: present
+
+- name: Assign Read-Only permissions on ESXi Server
+  community.vmware.vmware_object_role_permission:
+    hostname: "{{ vcenter_server['hostname'] }}"
+    username: "{{ vcenter_server['username'] }}"
+    password: "{{ vcenter_password }}"
+    role: "ReadOnly"
+    principal: "{{ awx_user_email }}"
+    object_type: "HostSystem"
+    object_name: "{{ vcenter_server['esxi_host'] }}"
+    recursive: no
+    state: present
+
+- name: Assign read only permission on root folder
+  community.vmware.vmware_object_role_permission:
+    hostname: "{{ vcenter_server['hostname'] }}"
+    username: "{{ vcenter_server['username'] }}"
+    password: "{{ vcenter_password }}"
+    role: "ReadOnly"
+    principal: "{{ awx_user_email }}"
+    object_name: rootFolder
+    recursive: no
+    state: present
+...

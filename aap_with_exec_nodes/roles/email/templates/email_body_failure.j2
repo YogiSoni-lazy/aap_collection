@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+
+<p></p>
+
+Dear <b>{{ user_fullname }}</b>,
+
+<p><b>Here is the summary of the build</b></p>
+
+<table width='40%'>
+  <tr><td><strong>Owner:</strong></td> <td>{{ user_fullname }}</td></tr>
+  <tr><td><strong>Build Status:</strong></td> <td><strong> <font color="red">FAILED</font></strong></td></tr>
+  <tr><td><strong>Job ID:</strong></td> <td>{{ awx_job_id }}</td></tr>
+  <tr><td><strong>Scenario:</strong></td> <td>{{ selected_scenario }}</td></tr>
+</table>
+
+<br>
+
+<h3><img src="https://drive.google.com/uc?export=view&id=1ib71yS44VFwNf0ew5Xu-O_btio4-77po" width="50px" height="50px" style="vertical-align:middle;margin:25px 5px""/>What's Next?</h3>
+  <li>Previous execution of Ansible Job has <strong><font color="red">FAILED</font></strong></li>
+  <li>It might be an environment glitch, please re-run the job from <strong>Jobs >> click on Latest Job and re-launch it</strong>.</li>
+  <li>If it fails multiple times, kindly report it to <a href="mailto:awxlab-admins@redhat.com?subject=Failed%20Ansible%20Deployment%20-%20Need%20additional%20debugging" target="_top">LAB Admin Team</a> for additional assistance.</li>
+
+<br>
+
+  <hr></hr>
+  <strong><font color="firebrick">We learn from FAILURE, not from Success. Use FAILURE as inspiration.</font></strong>
+
+</html>

@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+
+<p></p>
+
+<p>Hello <b>{{ user_fullname }},</b></p>
+{% if new_expiry_date is defined %}
+<p>Expiry date of your deployed AAP Setup has been extended <b>successfully</b>.</p>
+
+<p>Your VM(s) new expiry date is <strong>{{ new_expiry_date }}</strong>.</p>
+{% else %}
+<p>Currently you don't have any machines provisioned, please run <b>Deploy AAP Setup</b> Template to launch your AAP Setup and then retry extending the expiry.</p>
+{% endif %}
+<br>
+<hr></hr>
+<strong>A big THANK YOU to all the hard-working Support Engineers out there! You guys are AWESOME.</strong>
+</html>

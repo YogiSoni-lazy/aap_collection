@@ -1,0 +1,7 @@
+- name: Configure HashiCorp Vault
+  hosts: vault_server
+  become: true
+  vars_files:
+    - variables.yml
+  roles:
+    - role: nshaik.aap_collection.hashicorp_vault

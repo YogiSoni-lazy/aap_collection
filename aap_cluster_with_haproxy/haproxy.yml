@@ -1,0 +1,8 @@
+---
+- name: Configure HAProxy LB for AAP Controller nodes
+  hosts: aap_lb,aap_controller
+  gather_facts: true
+  become: true
+  roles:
+    - role: nshaik.aap_collection.haproxy
+      when: inventory_hostname in groups['aap_lb']

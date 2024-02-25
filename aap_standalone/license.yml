@@ -1,0 +1,20 @@
+---
+- name: Apply Subscription Manifest to Controller
+  hosts: aap_controller[0]
+  gather_facts: false
+  vars_files:
+    - variables.yml
+  tasks:
+    - name: Copy manifest zip file to the Controller node
+      ansible.builtin.copy:
+        src: manifest_aap.zip
+        dest: manifest_aap.zip
+        mode: "preserve"
+
+    - name: Attach manifest to controller
+      awx.awx.license:
+        controller_host: "{{ controller_hostname }}"
+        controller_username: "admin"
+        controller_password: "{{ aap_setup_prep_inv_secrets['all']['admin_password'] }}"
+        manifest: "manifest_aap.zip"
+        validate_certs: false

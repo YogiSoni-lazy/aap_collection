@@ -1,0 +1,8 @@
+---
+- name: Setup FreeIPA Server
+  hosts: ldap_server
+  become: true
+  vars_files: 
+    - variables.yml
+  roles:
+    - role: nshaik.aap_collection.freeipa

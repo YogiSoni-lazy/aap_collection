@@ -1,0 +1,46 @@
+---
+# tasks file for haproxy
+- name: Install HAProxy package
+  ansible.builtin.package:
+    name: haproxy
+    state: present
+    update_cache: true
+
+- name: Enable haproxy_connect_any SELinux Boolean
+  ansible.posix.seboolean:
+    name: haproxy_connect_any
+    state: true
+    persistent: true
+
+- name: Copy HAProxy configuration file
+  ansible.builtin.template:
+    src: "{{ (lb_server_offloading | default(true)) | ternary('offloading_haproxy.cfg.j2','passthrough_haproxy.cfg.j2') }}"
+    dest: /etc/haproxy/haproxy.cfg
+    owner: root
+    group: root
+    mode: 0644
+    validate: haproxy -c -f %s
+  notify: restart haproxy service
+
+- name: Start and Enable HAProxy Service
+  ansible.builtin.service:
+    name: haproxy
+    state: started
+    enabled: true
+
+- name: Open HTTP and HTTPS ports on LB Server
+  ansible.posix.firewalld:
+    service: "{{ item }}"
+    permanent: true
+    state: enabled
+    immediate: true
+  loop:
+    - http
+    - https
+
+- name: Open 9000 port on LB Server
+  ansible.posix.firewalld:
+    port: 9000/tcp
+    permanent: true
+    state: enabled
+    immediate: true

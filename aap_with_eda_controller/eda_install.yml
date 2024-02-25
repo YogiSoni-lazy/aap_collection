@@ -1,0 +1,11 @@
+---
+- name: Download and Install Event Driven Ansible
+  hosts: eda_controller[0]
+  gather_facts: true
+  become: true
+  vars_files:
+    - eda_vars.yml
+  roles:
+    - infra.aap_utilities.aap_setup_download
+    - infra.aap_utilities.aap_setup_prepare
+    - infra.aap_utilities.aap_setup_install

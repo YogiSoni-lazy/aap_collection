@@ -1,0 +1,60 @@
+---
+- name: Configure /etc/hosts
+  blockinfile:
+    path: /etc/hosts
+    backup: yes
+    marker: "#{mark} ANSIBLE MANAGED BLOCK"
+    block: |
+      172.25.123.60     controller
+      172.25.123.61      execnode1
+      172.25.123.62      execnode2
+
+- name: Controller User SSH Public Key
+  ansible.builtin.command: cat /root/.ssh/id_rsa.pub
+  register: ssh_key_content
+  when: ansible_fqdn == "controller.example.com"
+
+- name: Save the IP address as ansible fact
+  set_fact:
+    key_content: "{{ ssh_key_content.stdout }}"
+  delegate_facts: true
+  delegate_to: "{{ item}}"
+  loop:
+    - controller
+    - execnode1
+    - execnode2
+  when: ansible_fqdn == "controller.example.com"
+
+- name: Inject user provided SSH public key
+  ansible.posix.authorized_key:
+    user: root
+    state: present
+    key: "{{ key_content }}"
+
+- name: "New"
+  command: "sudo subscription-manager remove --all"
+  ignore_errors: true
+
+- name: "New"
+  command: "sudo subscription-manager unregister"
+  ignore_errors: true
+
+- name: "New"
+  command: "sudo subscription-manager clean"
+  ignore_errors: true
+
+- name: "New"
+  command: "sudo subscription-manager register --username rhn-support-ysoni --password Elephant_white100@#_ --auto-attach --force"
+  ignore_errors: true
+
+- name: "New"
+  command: "sudo subscription-manager attach --pool=2c94d9658d9ea93e018da404d22b56fe"
+  ignore_errors: true
+
+- name: Disable hostkey
+  blockinfile:
+    path: /root/.ssh/config
+    create: true
+    block: |
+      Host *
+        StrictHostKeyChecking no

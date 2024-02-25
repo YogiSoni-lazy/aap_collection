@@ -1,0 +1,8 @@
+---
+- name: Configure AAP Cluster
+  hosts: aap_controller
+  become: true
+  vars_files:
+    - variables.yml
+  roles:
+    - role: nshaik.aap_collection.configure_aap_cluster

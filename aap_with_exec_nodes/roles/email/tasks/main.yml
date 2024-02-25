@@ -1,0 +1,257 @@
+---
+- name: Set controller user fact
+  ansible.builtin.set_fact:
+    controller_user: "{{ (user_name is defined) | ternary(user_name,awx_user_name) }}"
+
+- name: Set user_folder_name fact
+  ansible.builtin.set_fact:
+    user_folder_name: "{{ vcenter_server['datacenter'] }}/vm/{{ vcenter_server['parent_folder'] }}/{{ controller_user }}"
+
+- name: Find all user VMs
+  community.vmware.vmware_vm_info:
+    hostname: "{{ vcenter_server['hostname'] }}"
+    username: "{{ vcenter_server['username'] }}"
+    password: "{{ vcenter_password }}"
+    folder: "{{ user_folder_name }}"
+    show_attribute: yes
+  register: user_vms
+
+- name: Find user VM properties from vCenter
+  community.vmware.vmware_guest_info:
+    hostname: "{{ vcenter_server['hostname'] }}"
+    username: "{{ vcenter_server['username'] }}"
+    password: "{{ vcenter_password }}"
+    datacenter: "{{ vcenter_server['datacenter'] }}"
+    schema: "vsphere"
+    properties: ["config.createDate"]
+    moid: "{{ user_vms['virtual_machines'][0]['moid'] }}"
+  register: vmguest
+  when: user_vms['virtual_machines']|length
+
+- name: Find Ansible Controller Hostname and IP details
+  ansible.builtin.set_fact:
+    aap_controller_hostname: "{{ lookup('dig', ''~item['ip_address']~'/PTR')[:-1] }}"
+    aap_controller_ipaddress: "{{ item['ip_address'] }}"
+  loop: "{{ user_vms['virtual_machines'] }}"
+  when:
+    - email_purpose == "expiration"
+    - "'-controller' in item['guest_name']"
+    - not item['attributes']['setup_lb']|bool
+    - user_vms['virtual_machines']|length
+
+- name: Find Ansible Controller1 Hostname and IP details
+  ansible.builtin.set_fact:
+    aap_controller1_hostname: "{{ lookup('dig', ''~item['ip_address']~'/PTR')[:-1] }}"
+    aap_controller1_ipaddress: "{{ item['ip_address'] }}"
+  loop: "{{ user_vms['virtual_machines'] }}"
+  when:
+    - email_purpose == "expiration"
+    - "'-controller1' in item['guest_name']"
+    - user_vms['virtual_machines']|length
+
+- name: Find Ansible Controller2 Hostname and IP details
+  ansible.builtin.set_fact:
+    aap_controller2_hostname: "{{ lookup('dig', ''~item['ip_address']~'/PTR')[:-1] }}"
+    aap_controller2_ipaddress: "{{ item['ip_address'] }}"
+  loop: "{{ user_vms['virtual_machines'] }}"
+  when:
+    - email_purpose == "expiration"
+    - "'-controller2' in item['guest_name']"
+    - user_vms['virtual_machines']|length
+
+- name: Find Automation Hub Hostname and IP details
+  ansible.builtin.set_fact:
+    aap_hub_hostname: "{{ lookup('dig', ''~item['ip_address']~'/PTR')[:-1] }}"
+    aap_hub_ipaddress: "{{ item['ip_address'] }}"
+  loop: "{{ user_vms['virtual_machines'] }}"
+  when:
+    - email_purpose == "expiration"
+    - "'-hub' in item['guest_name']"
+    - user_vms['virtual_machines']|length
+
+- name: Find EDA Controller Hostname and IP details
+  ansible.builtin.set_fact:
+    aap_eda_hostname: "{{ lookup('dig', ''~item['ip_address']~'/PTR')[:-1] }}"
+    aap_eda_ipaddress: "{{ item['ip_address'] }}"
+  loop: "{{ user_vms['virtual_machines'] }}"
+  when:
+    - email_purpose == "expiration"
+    - "'-eda' in item['guest_name']"
+    - user_vms['virtual_machines']|length
+
+- name: Find External DB Hostname and IP details
+  ansible.builtin.set_fact:
+    aap_db_hostname: "{{ lookup('dig', ''~item['ip_address']~'/PTR')[:-1] }}"
+    aap_db_ipaddress: "{{ item['ip_address'] }}"
+  loop: "{{ user_vms['virtual_machines'] }}"
+  when:
+    - email_purpose == "expiration"
+    - "'-db' in item['guest_name']"
+    - user_vms['virtual_machines']|length
+
+- name: Find LB Hostname and IP details
+  ansible.builtin.set_fact:
+    aap_lb_hostname: "{{ lookup('dig', ''~item['ip_address']~'/PTR')[:-1] }}"
+    aap_lb_ipaddress: "{{ item['ip_address'] }}"
+  loop: "{{ user_vms['virtual_machines'] }}"
+  when:
+    - email_purpose == "expiration"
+    - "'-lb' in item['guest_name']"
+    - user_vms['virtual_machines']|length
+
+- name: Find VM created date fact
+  ansible.builtin.set_fact:
+    created_date: "{{ vmguest['instance']['config']['createDate'] }}"
+  when:
+    - vmguest is defined
+    - vmguest['instance'] is defined
+
+- name: Set VM expiry and reminder date facts
+  ansible.builtin.set_fact:
+    reminder1_date: "{{ lookup('pipe', 'TZ=' + timezone + ' date -d ' + '\"' + created_date + ' ' + expiration['first_reminder'] + ' days\" +\"%Y-%m-%d %T\"') }}"
+    reminder2_date: "{{ lookup('pipe', 'TZ=' + timezone + ' date -d ' + '\"' + created_date + ' ' + expiration['second_reminder'] + ' days\" +\"%Y-%m-%d %T\"') }}"
+    expiry_date: "{{ lookup('pipe', 'TZ=' + timezone + ' date -d ' + '\"' + created_date + ' ' + expiration['max_days'] + ' days\" +\"%Y-%m-%d %T\"') }}"
+  when:
+    - vmguest is defined
+    - vmguest['instance']|length
+
+- name: Set VM dates fact
+  ansible.builtin.set_fact:
+    vm_created_date: "{{ lookup('pipe', 'TZ=' + timezone + ' date -d \"' + created_date + '\"') }}"
+    vm_expiry_date: "{{ lookup('pipe', 'TZ=' + timezone + ' date -d \"' + created_date + ' ' + expiration['max_days'] + 'days\"') }}"
+  when:
+    - vmguest is defined
+    - vmguest['instance']|length
+
+- name: Fetch expiry date from schedule
+  ansible.builtin.set_fact:
+    expiry_date: "{{ query('awx.awx.controller_api', 'schedules', query_params={'name': controller_user + '_vms_destroy' }, host=awxlab_controller_hostname, username=awxlab_controller_super_user, password=awxlab_controller_password, verify_ssl=False) | map(attribute='dtstart') }}"
+  when: email_purpose == "expiration"
+
+- name: Set VM Expiry date when extended
+  ansible.builtin.set_fact:
+    vm_expiry_date: "{{ lookup('pipe', 'TZ=' + timezone + ' date -d \"' + expiry_date[0] + '\"') }}"
+  when: 
+    - email_purpose == "expiration"
+    - expiry_date is defined
+    - expiry_date|length
+
+- name: Create first expiration schedule
+  awx.awx.schedule:
+    name: "{{ controller_user }}_reminder1"
+    extra_data:
+      {
+        "user_name": "{{ controller_user }}",
+        "user_fullname": "{{ user_fullname }}",
+        "scenario": "{{ scenario }}",
+        "reminder_alert": "one"
+      }
+    state: present
+    enabled: yes
+    unified_job_template: "Automation - email Expiration"
+    rrule: "{{ query('awx.awx.schedule_rrule', 'none', start_date=reminder1_date, timezone=timezone) }}"
+    controller_host: "{{ awxlab_controller_hostname }}"
+    controller_username: "{{ awxlab_controller_super_user }}"
+    controller_password: "{{ awxlab_controller_password }}"
+    validate_certs: false
+  when: email_purpose == "success"
+
+- name: Create second expiration schedule
+  awx.awx.schedule:
+    name: "{{ controller_user }}_reminder2"
+    extra_data:
+      {
+        "user_name": "{{ controller_user }}",
+        "user_fullname": "{{ user_fullname }}",
+        "scenario": "{{ scenario }}",
+        "reminder_alert": "two"
+      }
+    state: present
+    enabled: yes
+    unified_job_template: "Automation - email Expiration"
+    rrule: "{{ query('awx.awx.schedule_rrule', 'none', start_date=reminder2_date, timezone=timezone) }}"
+    controller_host: "{{ awxlab_controller_hostname }}"
+    controller_username: "{{ awxlab_controller_super_user }}"
+    controller_password: "{{ awxlab_controller_password }}"
+    validate_certs: false
+  when: email_purpose == "success"
+
+- name: Create schedule for VM deletion
+  awx.awx.schedule:
+    name: "{{ controller_user }}_vms_destroy"
+    extra_data:
+      {
+        "user_name": "{{ controller_user }}",
+        "delete_confirmation": true
+      }
+    state: present
+    unified_job_template: "Automation - Destroy VMs"
+    rrule: "{{ query('awx.awx.schedule_rrule', 'none', start_date=expiry_date, timezone=timezone) }}"
+    controller_host: "{{ awxlab_controller_hostname }}"
+    controller_username: "{{ awxlab_controller_super_user }}"
+    controller_password: "{{ awxlab_controller_password }}"
+    validate_certs: false
+  when: email_purpose == "success"
+
+- name: Set fact for clearing expiration schedule
+  ansible.builtin.set_fact:
+    schedule_name: >-
+      {{ controller_user + '_reminder1' if reminder_alert == 'one' else
+      ((reminder_alert == 'two') | ternary(controller_user + '_reminder2',controller_user + '_vms_destroy')) }}
+  when: email_purpose == "expiration"
+
+- name: Cleanup schedule
+  awx.awx.schedule:
+    name: "{{ schedule_name }}"
+    state: absent
+    controller_host: "{{ awxlab_controller_hostname }}"
+    controller_username: "{{ awxlab_controller_super_user }}"
+    controller_password: "{{ awxlab_controller_password }}"
+    validate_certs: false
+  when:
+    - email_purpose == "expiration"
+    - schedule_name is defined
+
+- name: Email {{ email_purpose | capitalize }} Details
+  community.general.mail:
+    host: "{{ smtp_host }}"
+    port: "{{ smtp_port }}"
+    subject: >-
+      {{ email_tag }}: {{ selected_scenario }} Setup Details
+    body: "{{ lookup('template', 'email_body_' + email_purpose + '.j2') }}"
+    from: "Ansible Admin <no-reply@{{ awxlab_controller_hostname }}>"
+    to: "{{ controller_user }}@{{ email_domain }}"
+    charset: utf8
+    subtype: html
+  when:
+    - reminder_alert is not defined
+    - email_purpose != "extend_expiration"
+
+- name: Email reminder alert details
+  community.general.mail:
+    host: "{{ smtp_host }}"
+    port: "{{ smtp_port }}"
+    subject: >-
+      {{ email_tag }}: Your instance would be automatically deleted in next
+      {{ (reminder_alert == 'one') | ternary(
+      (expiration['max_days']|int - expiration['first_reminder']|int),(expiration['max_days']|int - expiration['second_reminder']|int)) }} day(s)
+    body: "{{ lookup('template', 'email_body_' + email_purpose + '.j2') }}"
+    from: "Ansible Admin <no-reply@{{ awxlab_controller_hostname }}>"
+    to: "{{ controller_user }}@{{ email_domain }}"
+    charset: utf8
+    subtype: html
+  when: reminder_alert is defined
+
+- name: Email new expiration details
+  community.general.mail:
+    host: "{{ smtp_host }}"
+    port: "{{ smtp_port }}"
+    subject: >-
+      {{ (new_expiry_date is defined) | ternary(email_tag + ': Your AAP deployment expiration has been extended successfully',
+      'ERROR: No user instances found') }}
+    body: "{{ lookup('template', 'email_body_' + email_purpose + '.j2') }}"
+    from: "Ansible Admin <no-reply@{{ awxlab_controller_hostname }}>"
+    to: "{{ controller_user }}@{{ email_domain }}"
+    charset: utf8
+    subtype: html
+  when: email_purpose == "extend_expiration"

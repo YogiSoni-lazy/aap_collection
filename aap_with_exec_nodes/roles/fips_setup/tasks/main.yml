@@ -1,0 +1,21 @@
+---
+- name: Enable FIPS mode in RHEL8 and above
+  ansible.builtin.command: bash -c "/usr/bin/fips-mode-setup --enable"
+  register: fips_mode_enable
+  when:
+    - not ansible_fips
+    - ansible_distribution_major_version|int >= 8
+  failed_when: "'Please reboot the system' not in fips_mode_enable['stdout']"
+
+- name: Reboot server to boot into FIPS mode
+  ansible.builtin.reboot:
+  when:
+    - not ansible_fips
+    - (grub_default_update_fips is success and grub_default_update_uuid is success) or
+      (fips_mode_enable is defined and fips_mode_enable['rc']|int == 0)
+
+- name: Verify FIPS status after reboot
+  ansible.builtin.command: bash -c '/usr/sbin/sysctl crypto.fips_enabled | awk "{ print \$(NF) }"'
+  register: fips_mode_check_final
+  failed_when: fips_mode_check_final['stdout']|int == 0
+...

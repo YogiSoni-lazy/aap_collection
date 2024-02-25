@@ -1,0 +1,10 @@
+---
+- name: Download and Install AAP2
+  hosts: aap_controller[0]
+  become: true
+  vars_files: 
+    - variables.yml
+  roles:
+    - aap_setup_download
+    - aap_setup_prepare
+    - aap_setup_install

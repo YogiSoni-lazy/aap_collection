@@ -1,0 +1,32 @@
+---
+- name: Run pre-check on AAP selection
+  ansible.builtin.import_playbook: precheck.yml
+  tags: aap_precheck
+
+- name: Run common tasks
+  ansible.builtin.import_playbook: common.yml
+  tags: common_tasks
+
+- name: Generate AAP Certs on Load Balancer
+  ansible.builtin.import_playbook: generate_certs.yml
+  tags: generate_certs
+
+- name: Install and Configure HAProxy
+  ansible.builtin.import_playbook: haproxy.yml
+  tags: haproxy_install
+
+- name: Install Red Hat Ansible Automation Platform
+  ansible.builtin.import_playbook: aap_install.yml
+  tags: aap_install
+
+- name: Configure AAP Nodes for Clustering
+  ansible.builtin.import_playbook: configure_aap_nodes.yml
+  tags: configure_aap_nodes
+
+- name: Attach Subscription to Ansible controller
+  ansible.builtin.import_playbook: license.yml
+  tags: attach_license
+
+- name: Print details
+  ansible.builtin.import_playbook: print_details.yml
+  tags: print_details

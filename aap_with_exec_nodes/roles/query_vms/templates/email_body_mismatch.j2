@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+
+<p></p>
+
+Dear <b>{{ user_fullname }}</b>,
+
+<br>
+
+<h3><img src="https://drive.google.com/uc?export=view&id=1LMgCyEMTNcX8hyehj5o8rap4IoVnYcxt" width="50px" height="50px" style="vertical-align:middle;margin:25px 5px""/>Information</h3>
+<li>You already have a AAP {{ aap_version_deployed }} setup with scenario {{ scenario_deployed }} deployed on RHEL{{ rhel_version_deployed }}, which is different to the one that you are trying to deploy now.</li>
+  <li>Choosing a different version (i.e. AAP Version or OS Version or Scenario) would corrupt the current deployed setup.</li>
+  <li>To deploy a different version of AAP Setup, delete your current VMs (<strong>NOTE:</strong> this action is irreversible).</li>
+  <li>Login to <a href="https://automation.awxlab.pnq2.redhat.com">Red Hat Ansible Controller</a> and navigate to <strong>Templates >> launch Delete deployed VMs</strong> job template to destroy your current VMs.</li>
+  <li>If you have any further queries, please send email to <a href="mailto:awxlab-admins@redhat.com?subject=Ansible%20JobID%20{{ awx_job_id }}%20Needs%20Clarification" target="_top">LAB Admin Team</a> for additional assistance.</li>
+
+<br>
+
+<hr></hr>
+  <strong><font color="coral">If you're not FAILING every now and again, it's a sign you're not doing anything very innovative.</font></strong>
+
+</html>

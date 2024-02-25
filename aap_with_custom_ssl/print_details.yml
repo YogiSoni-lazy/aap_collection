@@ -1,0 +1,10 @@
+---
+- name: Print Host details
+  hosts: all:!localhost
+  gather_facts: true
+  tasks:
+    - name: Print IP and FQDN
+      debug:
+        msg: "Your host FQDN is {{ hostvars[item]['ansible_fqdn'] }} and IP Address is {{ hostvars[item]['ansible_eth1']['ipv4']['address'] }}"
+      loop: "{{ groups['all'] | difference(groups['ungrouped']) }}"
+      run_once: true
