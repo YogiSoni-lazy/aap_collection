@@ -1,1 +1,0 @@
-{"rsync":{"/vagrant":{"type":"rsync","guestpath":"/vagrant","hostpath":"/home/yogita/aap/aap_with_exec_nodes","disabled":false,"__vagrantfile":true,"owner":"vagrant","group":"vagrant"}}}
